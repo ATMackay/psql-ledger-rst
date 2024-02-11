@@ -334,21 +334,28 @@ async fn main() -> std::io::Result<()> {
     let pool = config.pg.create_pool(None, NoTls).unwrap();
 
     let server = HttpServer::new(move || {
-        App::new().app_data(web::Data::new(pool.clone()))
-            .service(web::resource("/create_account")
-                .route(web::post().to(create_account)))
-            .service(web::resource("/accounts")
-                .route(web::get().to(get_accounts)))
-            .service(web::resource("/account_by_id")
-                .route(web::get().to(get_account_by_id)))
-            .service(web::resource("/transactions")
-                .route(web::get().to(get_transactions)))
-            .service(web::resource("/create_transaction")
-                .route(web::post().to(create_transaction)))
+        let app = App::new().app_data(web::Data::new(pool.clone()))
+        .service(web::resource("/create_account")
+            .route(web::post().to(create_account)))
+        .service(web::resource("/accounts")
+            .route(web::get().to(get_accounts)))
+        .service(web::resource("/account_by_id")
+            .route(web::get().to(get_account_by_id)))
+        .service(web::resource("/transactions")
+            .route(web::get().to(get_transactions)))
+        .service(web::resource("/create_transaction")
+            .route(web::post().to(create_transaction)));
+
+        // Log all available endpoints - TODO
+        //for resource in app.resources() {
+         //   log::info!("registered endpoint: {}", resource.path());
+        //}
+
+        app
     })
     .bind(config.server_addr.clone())?
     .run();
-    log::info!("Server running at http://{}/", config.server_addr);
+    log::info!("PSQL Server running at http://{}", config.server_addr);
 
     server.await
 }
