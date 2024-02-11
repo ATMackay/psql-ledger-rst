@@ -17,8 +17,8 @@ fi
 docker build \
        --build-arg ARCH="$ARCH" \
        --build-arg BUILD_DATE="$(git show -s --format=%ci "$commit_hash")"\
-       --build-arg SERVICE=psqlledger \
+       --build-arg SERVICE=psqlledger-rst \
        --build-arg GIT_SHA="$commit_hash" \
-       -t "${ECR}"psqlledger:latest  \
-       -t "${ECR}"psqlledger:"$commit_hash_short"  \
+       -t "${ECR}"psqlledger-rst:latest  \
+       -t "${ECR}"psqlledger-rst:"$commit_hash_short"  \
        -f Dockerfile ..

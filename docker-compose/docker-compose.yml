@@ -1,0 +1,35 @@
+version: '3'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_DB: bank
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d bank"]
+      interval: 3s
+      timeout: 5s
+      retries: 3
+
+  psqlledger:
+    image: psqlledger-rst:latest
+    #build:
+    #  context: ../docker
+    #  dockerfile: Dockerfile
+    container_name: psqlledger
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PSQLLEDGER_POSTGRES_HOST: postgres
+      PSQLLEDGER_POSTGRES_PORT: 5432
+      PSQLLEDGER_POSTGRES_USER: root
+      PSQLLEDGER_POSTGRES_PASSWORD: secret
+      PSQLLEDGER_POSTGRES_DB: bank
+    ports:
+      - "8080:8080"

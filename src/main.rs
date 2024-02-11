@@ -1,19 +1,20 @@
 mod config {
+    use deadpool_postgres::Config as PgConfig;
+    use deadpool_postgres::SslMode;
     use serde::Deserialize;
     use std::fs::File;
     use std::io::{BufReader, Error};
-    use deadpool_postgres::Config as PgConfig;
-    use deadpool_postgres::SslMode ;
 
     #[derive(Debug, Default, Deserialize)]
     pub struct Config {
+        pub log_level: String,
         pub server_addr: String,
         pub pg: PgConfig,
     }
 
     pub fn default_config() -> Config {
-
-        let mut cfg =  Config {
+        let mut cfg = Config {
+            log_level: "info".to_string(),
             server_addr: "localhost:8080".to_string(),
             pg: PgConfig::default(),
         };
@@ -35,32 +36,32 @@ mod config {
 
         cfg
     }
-    
+
     impl Config {
         pub fn from_file(filename: &str) -> Result<Self, Error> {
             let file = File::open(filename)?;
             let reader = BufReader::new(file);
-    
+
             // Handle file reading and parsing errors here
             // For example:
             let config: Config = serde_json::from_reader(reader)?;
-    
+
             Ok(config)
         }
-    
-        pub fn from_env() -> Result<Self, envy::Error> {
-            envy::from_env::<Config>()
-        }
+
+        //pub fn from_env() -> Result<Self, envy::Error> {
+        //    envy::from_env::<Config>()
+        //}
     }
 }
 
 mod models {
-    use serde::{Deserialize, Serialize, Serializer}; 
-    use chrono::{DateTime, Utc};
+    //use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Serialize}; // Serializer
     use tokio_pg_mapper_derive::PostgresMapper;
 
     #[derive(Deserialize, PostgresMapper, Serialize)]
-    #[pg_mapper(table = "accounts")] 
+    #[pg_mapper(table = "accounts")]
     pub struct Account {
         pub id: i64,
         pub username: String,
@@ -70,7 +71,7 @@ mod models {
         //pub created_at: DateTime<Utc>,
     }
     #[derive(Deserialize, PostgresMapper, Serialize)]
-    #[pg_mapper(table = "transactions")] 
+    #[pg_mapper(table = "transactions")]
     pub struct Transaction {
         pub id: i64,
         pub from_account: i64,
@@ -81,13 +82,13 @@ mod models {
     }
 
     // Custom serialization function for DateTime<Utc> - TODO
-    fn serialize_datetime<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = date.to_rfc3339();
-        serializer.serialize_str(&s)
-    }
+    //fn serialize_datetime<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+    //where
+    //    S: Serializer,
+    //{
+    //    let s = date.to_rfc3339();
+    //    serializer.serialize_str(&s)
+    //}
 }
 
 mod errors {
@@ -124,7 +125,10 @@ mod db {
     use deadpool_postgres::Client;
     use tokio_pg_mapper::FromTokioPostgresRow;
 
-    use crate::{errors::MyError, models::{Account, Transaction}};
+    use crate::{
+        errors::MyError,
+        models::{Account, Transaction},
+    };
 
     pub async fn get_accounts(client: &Client) -> Result<Vec<Account>, MyError> {
         let stmt = "SELECT * FROM accounts ORDER BY id";
@@ -141,7 +145,7 @@ mod db {
         Ok(results)
     }
 
-    pub async fn get_account_by_id(client: &Client, account_id: i64) -> Result<Account, MyError>  {
+    pub async fn get_account_by_id(client: &Client, account_id: i64) -> Result<Account, MyError> {
         let stmt = "SELECT * FROM accounts WHERE id = $1 LIMIT 1";
         let stmt = stmt.replace("$table_fields", &Account::sql_table_fields());
         let stmt = client.prepare(&stmt).await.unwrap();
@@ -154,10 +158,12 @@ mod db {
             .collect::<Vec<Account>>()
             .pop()
             .ok_or(MyError::NotFound)
-
     }
 
-    pub async fn create_account(client: &Client, account_info: Account) -> Result<Account, MyError> {
+    pub async fn create_account(
+        client: &Client,
+        account_info: Account,
+    ) -> Result<Account, MyError> {
         let _stmt = "INSERT INTO accounts (
             username, balance, email
         ) VALUES (
@@ -168,13 +174,7 @@ mod db {
         let stmt = client.prepare(&_stmt).await.unwrap();
 
         client
-            .query(
-                &stmt,
-                &[
-                    &account_info.email,
-                    &account_info.username,
-                ],
-            )
+            .query(&stmt, &[&account_info.email, &account_info.username])
             .await?
             .iter()
             .map(|row| Account::from_row_ref(row).unwrap())
@@ -182,7 +182,7 @@ mod db {
             .pop()
             .ok_or(MyError::NotFound) // more applicable for SELECTs
     }
-    
+
     pub async fn get_transactions(client: &Client) -> Result<Vec<Transaction>, MyError> {
         let stmt = "SELECT * FROM transactions ORDER BY id";
         let stmt = stmt.replace("$table_fields", &Transaction::sql_table_fields());
@@ -198,7 +198,10 @@ mod db {
         Ok(results)
     }
 
-    pub async fn create_transaction(client: &Client, transaction_info: Transaction) -> Result<Transaction, MyError> {
+    pub async fn create_transaction(
+        client: &Client,
+        transaction_info: Transaction,
+    ) -> Result<Transaction, MyError> {
         let _stmt = "INSERT INTO transactions (
             from_account, to_account, amount
         ) VALUES (
@@ -230,7 +233,11 @@ mod handlers {
     use actix_web::{web, Error, HttpResponse};
     use deadpool_postgres::{Client, Pool};
 
-    use crate::{db, errors::MyError, models::{Account, Transaction}};
+    use crate::{
+        db,
+        errors::MyError,
+        models::{Account, Transaction},
+    };
 
     pub async fn get_accounts(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
         let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
@@ -287,34 +294,34 @@ mod handlers {
     }
 }
 
-use crate::config::{Config, default_config};
+use crate::config::{default_config, Config};
 use actix_web::{web, App, HttpServer};
-use handlers::{get_accounts, get_account_by_id, create_account, create_transaction, get_transactions};
-use tokio_postgres::NoTls;
+use clap;
 use env_logger::Env;
+use handlers::{
+    create_account, create_transaction, get_account_by_id, get_accounts, get_transactions,
+};
 use std::env;
+use tokio_postgres::NoTls;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    
-    env_logger::Builder::from_env(Env::default().default_filter_or("info"))
-        .format_timestamp_millis()
-        .init();
+    // Read config file from flag
 
-    log::info!("welcome to psql-ledger-rst");
+    let matches = clap::App::new("MyApp")
+        .arg(
+            clap::Arg::with_name("config")
+                .long("config")
+                .value_name("FILE")
+                .help("Sets the config file to use")
+                .takes_value(true),
+        )
+        .get_matches();
 
-    if let Some(semver) = env::var("VERSION").ok() {
-        log::info!("version: {}", semver);
-    }
-    if let Some(git_hash) = env::var("GIT_HASH").ok() {
-        log::info!("git commit: {}", git_hash);
-    }
-    if let Some(build_date) = env::var("BUILD_DATE").ok() {
-        log::info!("compilation date {}", build_date);
-    }
+    // Check if the user provided a file name via the --config flag
+    let config_file = matches.value_of("config").unwrap_or("config.json");
 
-
-    let config = match Config::from_file("config.json") {
+    let config = match Config::from_file(config_file) {
         Ok(config) => {
             log::info!("Loaded configuration from file.");
             // Use the loaded config
@@ -327,28 +334,47 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    
+    let log_level = config.log_level;
+
+    env_logger::Builder::from_env(Env::default().default_filter_or(&log_level))
+        .format_timestamp_millis()
+        .init();
+
+    log::info!("welcome to psql-ledger-rst");
+
+    log::info!("log level: {}", &log_level);
+
+    log::info!("using config file: {}", config_file);
+
+    if let Some(semver) = env::var("VERSION").ok() {
+        log::info!("version: {}", semver);
+    }
+    if let Some(git_hash) = env::var("GIT_HASH").ok() {
+        log::info!("git commit: {}", git_hash);
+    }
+    if let Some(build_date) = env::var("BUILD_DATE").ok() {
+        log::info!("compilation date {}", build_date);
+    }
+
     log::info!("Server Address: {}", config.server_addr);
     log::debug!("PostgreSQL Configuration: {:?}", config.pg);
 
     let pool = config.pg.create_pool(None, NoTls).unwrap();
 
     let server = HttpServer::new(move || {
-        let app = App::new().app_data(web::Data::new(pool.clone()))
-        .service(web::resource("/create_account")
-            .route(web::post().to(create_account)))
-        .service(web::resource("/accounts")
-            .route(web::get().to(get_accounts)))
-        .service(web::resource("/account_by_id")
-            .route(web::get().to(get_account_by_id)))
-        .service(web::resource("/transactions")
-            .route(web::get().to(get_transactions)))
-        .service(web::resource("/create_transaction")
-            .route(web::post().to(create_transaction)));
+        let app = App::new()
+            .app_data(web::Data::new(pool.clone()))
+            .service(web::resource("/create_account").route(web::post().to(create_account)))
+            .service(web::resource("/accounts").route(web::get().to(get_accounts)))
+            .service(web::resource("/account_by_id").route(web::get().to(get_account_by_id)))
+            .service(web::resource("/transactions").route(web::get().to(get_transactions)))
+            .service(
+                web::resource("/create_transaction").route(web::post().to(create_transaction)),
+            );
 
         // Log all available endpoints - TODO
         //for resource in app.resources() {
-         //   log::info!("registered endpoint: {}", resource.path());
+        //   log::info!("registered endpoint: {}", resource.path());
         //}
 
         app

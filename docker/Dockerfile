@@ -1,5 +1,5 @@
-# Use a  golang alpine as the base image
-FROM rust:latest as builder
+# Use a  rust alpine as the base image
+FROM rust:1.67 as builder
 
 # Setup
 
@@ -17,17 +17,15 @@ ENV service_name=$SERVICE
 RUN echo "building service: ${service_name}, build date: ${build_date}, commit hash: ${commit_hash}, architecture: ${arch}"
 
 # Set the working directory
-WORKDIR /
-COPY . .
+WORKDIR /usr/src/psql-ledger-rst
+# Copy entire directory (minus ignored files)
+COPY ./ ./
 
-RUN cargo build --release
+RUN cargo build -r
 
 # Use a minimal container for the executable
-FROM debian:buster-slim
-
-
+FROM debian:bullseye-slim
 WORKDIR /usr/src/psql-ledger-rst
-
 # Copy binary over
 COPY --from=builder /usr/src/psql-ledger-rst/target/release/psql-ledger-rst /usr/src/psql-ledger-rst
 
@@ -35,5 +33,5 @@ COPY --from=builder /usr/src/psql-ledger-rst/target/release/psql-ledger-rst /usr
 EXPOSE 8080
 
 # Run the binary
-ENTRYPOINT ["/psql-ledger-rst"]
+CMD ["/psql-ledger-rst"]
 
