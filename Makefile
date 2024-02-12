@@ -35,6 +35,6 @@ dropdb:
 
 # Requires migrate installation: https://github.com/golang-migrate/migrate/tree/master/cmd/migrate
 migrateup:
-	cargo install refinery_cli && refinery migrate -e DB_URI="postgresql://root:secret@localhost:5432/bank?sslmode=disable" -p ./sql/migrations
+	migrate -path sql/migrations -database "postgresql://root:secret@localhost:5432/bank?sslmode=disable" -verbose up
 
 .PHONY: build run test docker docker-compose postgresup postgresdown createdb dropdb migrateup migratedown 

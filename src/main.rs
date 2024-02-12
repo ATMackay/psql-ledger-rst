@@ -14,7 +14,7 @@ mod config {
 
     pub fn default_config() -> Config {
         let mut cfg = Config {
-            log_level: "info".to_string(),
+            log_level: "debug".to_string(),
             server_addr: "localhost:8080".to_string(),
             pg: PgConfig::default(),
         };
@@ -81,6 +81,21 @@ mod models {
         //pub created_at: DateTime<Utc>,
     }
 
+    #[derive(Deserialize, Serialize)]
+    pub struct Status {
+        pub service: String,
+        pub version: String,
+        pub message: String,
+    }
+
+    #[derive(Deserialize, Serialize)]
+    pub struct Health {
+        pub service: String,
+        pub version: String,
+        pub message: String,
+        pub failures: Vec<String>,
+    }
+
     // Custom serialization function for DateTime<Utc> - TODO
     //fn serialize_datetime<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
     //where
@@ -89,6 +104,37 @@ mod models {
     //    let s = date.to_rfc3339();
     //    serializer.serialize_str(&s)
     //}
+}
+
+mod constants {
+
+    use std::env;
+
+    pub fn build_date() -> String {
+        let mut build_date = String::new();
+        if let Some(b) = env::var("BUILD_DATE").ok() {
+            build_date = b
+        };
+        build_date
+    }
+
+    pub fn service_name() -> String {
+        let mut service_name = String::new();
+        if let Some(s) = env::var("SERVICE_NAME").ok() {
+            service_name = s
+        };
+        service_name
+    }
+
+    pub fn full_version() -> String {
+        let mut version = String::new();
+        if let Some(v) = env::var("VERSION").ok() {
+            if let Some(g) = env::var("GIT_COMMIT").ok() {
+                version = format!("{}-{}", v, g)
+            };
+        };
+        version
+    }
 }
 
 mod errors {
@@ -129,6 +175,12 @@ mod db {
         errors::MyError,
         models::{Account, Transaction},
     };
+
+    pub async fn ping_db(client: &Client) -> Result<(), MyError> {
+        let _ = client.query_one("SELECT NOW()", &[]).await?;
+
+        Ok(())
+    }
 
     pub async fn get_accounts(client: &Client) -> Result<Vec<Account>, MyError> {
         let stmt = "SELECT * FROM accounts ORDER BY id";
@@ -230,14 +282,52 @@ mod db {
 }
 
 mod handlers {
+    use crate::{
+        constants, db,
+        errors::MyError,
+        models::{Account, Health, Status, Transaction},
+    };
     use actix_web::{web, Error, HttpResponse};
     use deadpool_postgres::{Client, Pool};
 
-    use crate::{
-        db,
-        errors::MyError,
-        models::{Account, Transaction},
-    };
+    // status always responds ok if the service is live and listening for requests
+    pub async fn status() -> Result<HttpResponse, Error> {
+        let health_response: Status = Status {
+            service: constants::service_name(),
+            message: "OK".to_string(),
+            version: constants::full_version(),
+        };
+        Ok(HttpResponse::Ok().json(health_response))
+    }
+
+    // health pings the postgres database, returning a 503 status code if the postgres ping fails.
+    pub async fn health(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+        let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
+
+        let mut failures = Vec::new();
+
+        match db::ping_db(&client).await {
+            Ok(_) => {
+                let health_response: Health = Health {
+                    service: constants::service_name(),
+                    message: "OK".to_string(),
+                    version: constants::full_version(),
+                    failures: failures,
+                };
+                Ok(HttpResponse::Ok().json(health_response))
+            }
+            Err(err) => {
+                failures.push(err.to_string());
+                let health_response: Health = Health {
+                    service: constants::service_name(),
+                    message: "FAILURES".to_string(),
+                    version: constants::full_version(),
+                    failures: failures,
+                };
+                Ok(HttpResponse::InternalServerError().json(health_response))
+            }
+        }
+    }
 
     pub async fn get_accounts(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
         let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
@@ -299,9 +389,9 @@ use actix_web::{web, App, HttpServer};
 use clap;
 use env_logger::Env;
 use handlers::{
-    create_account, create_transaction, get_account_by_id, get_accounts, get_transactions,
+    create_account, create_transaction, get_account_by_id, get_accounts, get_transactions, health,
+    status,
 };
-use std::env;
 use tokio_postgres::NoTls;
 
 #[actix_web::main]
@@ -340,19 +430,11 @@ async fn main() -> std::io::Result<()> {
         .format_timestamp_millis()
         .init();
 
-    if let Some(service_name) = env::var("SERVICENAME").ok() {
-        log::info!("welcome to {}", service_name);
-    }
+    log::info!("welcome to {}", constants::service_name());
 
-    if let Some(semver) = env::var("VERSION").ok() {
-        log::info!("version: {}", semver);
-    }
-    if let Some(git_hash) = env::var("GIT_HASH").ok() {
-        log::info!("git commit: {}", git_hash);
-    }
-    if let Some(build_date) = env::var("BUILD_DATE").ok() {
-        log::info!("compilation date {}", build_date);
-    }
+    log::info!("version: {}", constants::full_version());
+
+    log::info!("compilation date {}", constants::build_date());
 
     log::info!("log level: {}", &log_level);
 
@@ -367,6 +449,8 @@ async fn main() -> std::io::Result<()> {
     let server = HttpServer::new(move || {
         let app = App::new()
             .app_data(web::Data::new(pool.clone()))
+            .service(web::resource("/status").route(web::get().to(status)))
+            .service(web::resource("/health").route(web::get().to(health)))
             .service(web::resource("/create_account").route(web::post().to(create_account)))
             .service(web::resource("/accounts").route(web::get().to(get_accounts)))
             .service(web::resource("/account_by_id").route(web::get().to(get_account_by_id)))

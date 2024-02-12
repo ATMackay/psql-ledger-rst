@@ -67,7 +67,7 @@ fn main() {
     let git_hash = String::from_utf8(git_output.stdout).unwrap();
     let git_hash = git_hash.trim();
     let short_sha: String = git_hash.chars().take(8).collect();
-    println!("cargo:rustc-env=GIT_HASH={}", short_sha);
+    println!("cargo:rustc-env=GIT_COMMIT={}", short_sha);
 
     // Build date
     let date_output = Command::new("date")
@@ -83,5 +83,5 @@ fn main() {
     let service_name = project_info.name;
 
     println!("cargo:rustc-env=VERSION={}", semver);
-    println!("cargo:rustc-env=SERVICENAME={}", service_name);
+    println!("cargo:rustc-env=SERVICE_NAME={}", service_name);
 }
