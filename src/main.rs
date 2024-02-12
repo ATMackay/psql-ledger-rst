@@ -340,11 +340,9 @@ async fn main() -> std::io::Result<()> {
         .format_timestamp_millis()
         .init();
 
-    log::info!("welcome to psql-ledger-rst");
-
-    log::info!("log level: {}", &log_level);
-
-    log::info!("using config file: {}", config_file);
+    if let Some(service_name) = env::var("SERVICENAME").ok() {
+        log::info!("welcome to {}", service_name);
+    }
 
     if let Some(semver) = env::var("VERSION").ok() {
         log::info!("version: {}", semver);
@@ -356,7 +354,12 @@ async fn main() -> std::io::Result<()> {
         log::info!("compilation date {}", build_date);
     }
 
+    log::info!("log level: {}", &log_level);
+
+    log::info!("using config file: {}", config_file);
+
     log::info!("Server Address: {}", config.server_addr);
+
     log::debug!("PostgreSQL Configuration: {:?}", config.pg);
 
     let pool = config.pg.create_pool(None, NoTls).unwrap();

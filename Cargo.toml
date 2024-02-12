@@ -20,3 +20,6 @@ envy = "0.4.2"
 chrono = "0.4.34"
 derive_more = "0.99.0"
 clap = "3.0"
+
+[build-dependencies]
+toml = "0.8.10"
