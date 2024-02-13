@@ -24,3 +24,10 @@ awc = "3.4.0"
 
 [build-dependencies]
 toml = "0.8.10"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "client_benchmark"
+harness = false

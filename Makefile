@@ -40,4 +40,7 @@ migrateup:
 migratedown:
 	migrate -path sql/migrations -database "postgresql://root:secret@localhost:5432/bank?sslmode=disable" -verbose down
 
+benchmarks:
+	cargo bench
+
 .PHONY: build run test docker docker-compose postgresup postgresdown createdb dropdb migrateup migratedown 
