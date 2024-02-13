@@ -8,7 +8,7 @@ import requests
 import json
 import time
 
-# Create a databse entry with the create_account endpoint
+# Create a database entry with the create_account endpoint
 url = "http://localhost:8080/create_account"
 body = {"username": "john_doe", "email": "johndoe@email.com"}
 response = requests.post(url, json=body)
