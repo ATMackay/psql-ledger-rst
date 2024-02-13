@@ -9,13 +9,6 @@ import json
 import time
 import random
 
-
-def rand_string_generator(prefix: str) -> str:
-    random_int = random.randint(0, 99999)
-    
-    # Append the random integer to the string and return the result
-    return "username" + str(random_int)
-
 def e2e_fetch_accounts(n: int): 
     # Create a database entry with the create_account endpoint
     url = "http://localhost:8080/create_account"
