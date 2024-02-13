@@ -7,35 +7,92 @@ psqlledger-rst and postgres to be running as separate processes... TODO
 import requests
 import json
 import time
+import random
 
-# Create a database entry with the create_account endpoint
-url = "http://localhost:8080/create_account"
-body = {"username": "john_doe", "email": "johndoe@email.com"}
-response = requests.post(url, json=body)
-if response.status_code == 200:
-    print(response.json())
-else:
-    print("Request failed")
-    quit()
+def e2e_fetch_accounts(n: int): 
+    # Create a database entry with the create_account endpoint
+    url = "http://localhost:8080/create_account"
 
-# Use account_by_id
-url = "http://localhost:8080/account_by_id"
+    random_int = random.randint(0, 99999)
 
-# Define the JSON-encoded body
-req_body = {"id": 1}
+    usrname = "exampleuser" + str(random_int)
+    email = "user" + str(random_int) + "@example.com"
 
-start_time = time.time()
-# Make 1000 requests for the account data
-for _ in range(1000):
+    body = {"username": usrname, "email": {"String": email, "Valid": True}}
 
-    # Request data from the server
-    response = requests.get(url, json=req_body)
 
-    # Check if the request was successful (status code 200)
-    if response.status_code == 200:
-        print(response.json())
-    else:
-        print("Request failed")
+    response = requests.post(url, json=body)
+    if response.status_code != 200:
+        body = {"username": usrname, "email":  email }
+        response = requests.post(url, json=body)
+        if response.status_code != 200:
+            print("Request failed: ", response.status_code)
+            quit()
 
-elapsed_time = time.time() - start_time
-print(f"Total elapsed time: {elapsed_time:.2f} seconds")
+
+    # Use account_by_id
+    url = "http://localhost:8080/accounts"
+
+
+    start_time = time.time()
+    # Make 1000 requests for the account data
+    for _ in range(n):
+
+        # Request data from the server
+        response = requests.get(url)
+
+        # Print error if the request was not successful
+        if response.status_code == 200:
+            print(response.json())
+        else:
+            print("Request failed: ", response.status_code)
+
+    elapsed_time = time.time() - start_time
+    print(f"Total elapsed time: {elapsed_time:.2f} seconds")
+    print(f"Rate: {n/elapsed_time} req/s")
+
+
+def e2e_health(n: int): 
+    # Use account_by_id
+    url = "http://localhost:8080/health"
+
+    start_time = time.time()
+    # Make 1000 requests for the account data
+    for _ in range(n):
+
+        # Request data from the server
+        response = requests.get(url)
+
+        # Print error if the request was not successful
+        if response.status_code == 200:
+            print(response.json())
+        else:
+            print("Request failed: ", response.json())
+
+    elapsed_time = time.time() - start_time
+    print(f"Total elapsed time: {elapsed_time:.2f} seconds")
+    print(f"Rate: {n/elapsed_time} req/s")
+
+def e2e_status(n: int): 
+    # Use account_by_id
+    url = "http://localhost:8080/status"
+
+    start_time = time.time()
+    # Make 1000 requests for the account data
+    for _ in range(n):
+
+        # Request data from the server
+        response = requests.get(url)
+
+        # Print error if the request was not successful
+        if response.status_code == 200:
+            print(response.json())
+        else:
+            print("Request failed: ", response.json())
+            
+    elapsed_time = time.time() - start_time
+    print(f"Total elapsed time: {elapsed_time:.2f} seconds")
+    print(f"Rate: {n/elapsed_time} req/s")
+
+if __name__ == "__main__":
+    e2e_fetch_accounts(10000) # Replace with method of your choosing
