@@ -115,6 +115,8 @@ pub mod models {
         //pub created_at: DateTime<Utc>,
     }
 
+    // status represents the default JSON
+    // response format (also used to encode error messages)
     #[derive(Deserialize, Serialize)]
     pub struct Status {
         pub service: String,
@@ -287,27 +289,40 @@ pub mod errors {
 pub mod handlers {
     use super::{
         constants, db,
-        errors::MyError,
         models::{Account, Health, Status, Transaction},
     };
     use actix_web::{web, Error, HttpResponse};
     use deadpool_postgres::{Client, Pool};
+    //use serde_json::Value;
+    //use actix_http;
 
     // status always responds ok if the service is live and listening for requests
     pub async fn status() -> Result<HttpResponse, Error> {
-        let health_response: Status = Status {
+        let status_response: Status = Status {
             service: constants::service_name(),
             message: "OK".to_string(),
             version: constants::full_version(),
         };
-        Ok(HttpResponse::Ok().json(health_response))
+        Ok(HttpResponse::Ok().json(status_response))
     }
 
     // health pings the postgres database, returning a 503 status code if the postgres ping fails.
     pub async fn health(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
-        let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
-
         let mut failures = Vec::new();
+
+        let client: Client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                failures.push(err.to_string());
+                let health_response: Health = Health {
+                    service: constants::service_name(),
+                    message: "FAILURES".to_string(),
+                    version: constants::full_version(),
+                    failures: failures,
+                };
+                return Ok(HttpResponse::ServiceUnavailable().json(health_response));
+            }
+        };
 
         match db::ping_db(&client).await {
             Ok(_) => {
@@ -327,48 +342,134 @@ pub mod handlers {
                     version: constants::full_version(),
                     failures: failures,
                 };
-                Ok(HttpResponse::InternalServerError().json(health_response))
+                Ok(HttpResponse::ServiceUnavailable().json(health_response))
             }
         }
     }
 
+    // get accounts returns the full (non-paginated) list of user accounts from the
+    // postgres DB.
     pub async fn get_accounts(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
-        let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
+        let client: Client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::ServiceUnavailable().json(response));
+            }
+        };
 
-        let users = db::get_accounts(&client).await?;
+        let users = match db::get_accounts(&client).await {
+            Ok(users) => users,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
 
         Ok(HttpResponse::Ok().json(users))
     }
 
+    // get_account_by_id returns the account details for the account with specified index.
     pub async fn get_account_by_id(
         account_params: web::Json<Account>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
-        let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
+        let client: Client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::ServiceUnavailable().json(response));
+            }
+        };
 
         let account_info: Account = account_params.into_inner();
-        let acc = db::get_account_by_id(&client, account_info.id).await?;
+
+        let acc = match db::get_account_by_id(&client, account_info.id).await {
+            Ok(acc) => acc,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
 
         Ok(HttpResponse::Ok().json(acc))
     }
 
+    // create_account registers a new account to the server. Provided the
+    // PostgesDB write is successful it will return the account details back to the request agent.
     pub async fn create_account(
         account_params: web::Json<Account>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
         let account_info: Account = account_params.into_inner();
 
-        let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
+        let client: Client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
 
-        let new_account = db::create_account(&client, account_info).await?;
+        let new_account = match db::create_account(&client, account_info).await {
+            Ok(new_account) => new_account,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
 
         Ok(HttpResponse::Ok().json(new_account))
     }
 
     pub async fn get_transactions(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
-        let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
+        let client: Client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
 
-        let txs = db::get_transactions(&client).await?;
+        let txs = match db::get_transactions(&client).await {
+            Ok(txs) => txs,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
 
         Ok(HttpResponse::Ok().json(txs))
     }
@@ -379,12 +480,43 @@ pub mod handlers {
     ) -> Result<HttpResponse, Error> {
         let tx_info: Transaction = tx_params.into_inner();
 
-        let client: Client = db_pool.get().await.map_err(MyError::PoolError)?;
+        let client: Client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
 
-        let new_tx = db::create_transaction(&client, tx_info).await?;
+        let new_tx = match db::create_transaction(&client, tx_info).await {
+            Ok(new_tx) => new_tx,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
 
         Ok(HttpResponse::Ok().json(new_tx))
     }
+
+    //async fn log_if_error(res: &ServiceResponse) -> String { - TODO
+    //    if res.status().as_u16() >= 400 {
+    //        let r_clone = res.clone();
+    //        let bytes = actix_http::body::to_bytes(r_clone.into_body()).await.unwrap();
+    //        let v: Value = serde_json::from_slice(&bytes).unwrap();
+    //        v.to_string()
+    //    } else {
+    //        "-".to_string()
+    //    }
+    //}
 }
 
 pub mod client {
@@ -453,7 +585,7 @@ pub mod client {
         account_params: Account,
     ) -> Result<Account, Error> {
         // server_addr string must be of the form <ip>:<port>
-        let url = format!("http://{}/create_account", server_addr);
+        let url = format!("http://{}/create-account", server_addr);
 
         // sanitize before sending
         let acc_pars = Account {
@@ -489,6 +621,56 @@ pub mod client {
                 ))
             })?;
             Ok(account)
+        } else {
+            // If the request failed, return an error response
+            Err(actix_web::error::ErrorInternalServerError(format!(
+                "Got error response code: {}",
+                response.status().as_str(),
+            )))
+        }
+    }
+
+    pub async fn create_transaction(
+        server_addr: String,
+        tx_params: Transaction,
+    ) -> Result<Transaction, Error> {
+        // server_addr string must be of the form <ip>:<port>
+        let url = format!("http://{}/create-tx", server_addr);
+
+        // sanitize before sending
+        let t_pars = Transaction {
+            id: Default::default(),
+            from_account: tx_params.from_account,
+            to_account: tx_params.to_account,
+            amount: tx_params.amount,
+        };
+
+        let body_json = serde_json::to_string(&t_pars).map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!(
+                "Failed to serialize request body: {}",
+                e
+            ))
+        })?;
+
+        let client = Client::default();
+
+        let mut response = client
+            .post(&url)
+            .send_json(&body_json) // Send JSON body
+            .await
+            .map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!("Server response error: {}", e))
+            })?;
+
+        // Check if the request was successful
+        if response.status().is_success() {
+            let tx: Transaction = response.json().await.map_err(|e| {
+                actix_web::error::ErrorInternalServerError(format!(
+                    "Error converting response body: {}",
+                    e
+                ))
+            })?;
+            Ok(tx)
         } else {
             // If the request failed, return an error response
             Err(actix_web::error::ErrorInternalServerError(format!(

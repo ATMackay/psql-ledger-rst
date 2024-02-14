@@ -6,6 +6,9 @@ build:
 run:
 	cargo run -r
 
+run-debug:
+	cargo run
+
 test: 
 	cargo test
 
@@ -43,4 +46,4 @@ migratedown:
 benchmarks:
 	cargo bench
 
-.PHONY: build run test docker docker-compose postgresup postgresdown createdb dropdb migrateup migratedown 
+.PHONY: build run run-debug test docker docker-compose postgresup postgresdown createdb dropdb migrateup migratedown 
