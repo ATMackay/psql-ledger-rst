@@ -1,5 +1,5 @@
 mod lib;
-use actix_web::{web, App, HttpServer};
+use actix_web::{middleware, web, App, HttpServer};
 use clap;
 use env_logger::Env;
 use lib::config::{default_config, Config};
@@ -12,8 +12,8 @@ use tokio_postgres::NoTls;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Read config file from flag
 
+    // Read config file from flag
     let matches = clap::App::new("MyApp")
         .arg(
             clap::Arg::with_name("config")
@@ -65,15 +65,20 @@ async fn main() -> std::io::Result<()> {
     let server = HttpServer::new(move || {
         let app = App::new()
             .app_data(web::Data::new(pool.clone()))
+            .wrap(
+                //middleware::Logger::new(
+                //    "%a %r %s %b %{Referer}i %{User-Agent}i %T %{ERROR_STATUS}xo",
+                //)
+                //.custom_response_replace("ERROR_STATUS", |res| log_if_error(res)), - TODO
+                middleware::Logger::default()
+            )
             .service(web::resource("/status").route(web::get().to(status)))
             .service(web::resource("/health").route(web::get().to(health)))
-            .service(web::resource("/create_account").route(web::post().to(create_account)))
+            .service(web::resource("/create-account").route(web::post().to(create_account)))
             .service(web::resource("/accounts").route(web::get().to(get_accounts)))
-            .service(web::resource("/account_by_id").route(web::get().to(get_account_by_id)))
+            .service(web::resource("/account-by-id").route(web::get().to(get_account_by_id)))
             .service(web::resource("/transactions").route(web::get().to(get_transactions)))
-            .service(
-                web::resource("/create_transaction").route(web::post().to(create_transaction)),
-            );
+            .service(web::resource("/create-tx").route(web::post().to(create_transaction)));
 
         // Log all available endpoints - TODO
         //for resource in app.resources() {

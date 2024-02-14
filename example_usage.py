@@ -11,22 +11,17 @@ import random
 
 def e2e_fetch_accounts(n: int): 
     # Create a database entry with the create_account endpoint
-    url = "http://localhost:8080/create_account"
-
+    url = "http://localhost:8080/create-account"
     random_int = random.randint(0, 99999)
-
     usrname = "exampleuser" + str(random_int)
     email = "user" + str(random_int) + "@example.com"
-
     body = {"username": usrname, "email": {"String": email, "Valid": True}}
-
-
     response = requests.post(url, json=body)
     if response.status_code != 200:
         body = {"username": usrname, "email":  email }
         response = requests.post(url, json=body)
         if response.status_code != 200:
-            print("Request failed: ", response.status_code)
+            print("Request failed: ", response.json())
             quit()
 
 
@@ -45,7 +40,7 @@ def e2e_fetch_accounts(n: int):
         if response.status_code == 200:
             print(response.json())
         else:
-            print("Request failed: ", response.status_code)
+            print("Request failed: ", response.json())
 
     elapsed_time = time.time() - start_time
     print(f"Total elapsed time: {elapsed_time:.2f} seconds")
@@ -95,4 +90,4 @@ def e2e_status(n: int):
     print(f"Rate: {n/elapsed_time} req/s")
 
 if __name__ == "__main__":
-    e2e_fetch_accounts(10000) # Replace with method of your choosing
+    e2e_status(10000) # Replace with method of your choosing
