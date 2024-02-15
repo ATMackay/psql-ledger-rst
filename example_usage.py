@@ -5,7 +5,6 @@ A few simple scripted tests for our psql rust server. Requires
 psqlledger-rst and postgres to be running as separate processes... TODO
 """
 import requests
-import json
 import time
 import random
 
@@ -16,10 +15,10 @@ def e2e_fetch_accounts(n: int):
     usrname = "exampleuser" + str(random_int)
     email = "user" + str(random_int) + "@example.com"
     body = {"username": usrname, "email": {"String": email, "Valid": True}}
-    response = requests.post(url, json=body)
+    response = requests.put(url, json=body)
     if response.status_code != 200:
         body = {"username": usrname, "email":  email }
-        response = requests.post(url, json=body)
+        response = requests.put(url, json=body)
         if response.status_code != 200:
             print("Request failed: ", response.json())
             quit()
@@ -37,9 +36,9 @@ def e2e_fetch_accounts(n: int):
         response = requests.get(url)
 
         # Print error if the request was not successful
-        if response.status_code == 200:
-            print(response.json())
-        else:
+        if response.status_code != 200:
+            #print(response.json())
+        #else:
             print("Request failed: ", response.json())
 
     elapsed_time = time.time() - start_time
@@ -90,4 +89,4 @@ def e2e_status(n: int):
     print(f"Rate: {n/elapsed_time} req/s")
 
 if __name__ == "__main__":
-    e2e_status(10000) # Replace with method of your choosing
+    e2e_fetch_accounts(10000) # Replace with method of your choosing

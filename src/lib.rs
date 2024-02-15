@@ -187,6 +187,24 @@ pub mod db {
             .ok_or(MyError::NotFound)
     }
 
+    pub async fn get_transaction_by_id(
+        client: &Client,
+        account_id: i64,
+    ) -> Result<Transaction, MyError> {
+        let stmt = "SELECT * FROM transactions WHERE id = $1 LIMIT 1";
+        let stmt = stmt.replace("$table_fields", &Account::sql_table_fields());
+        let stmt = client.prepare(&stmt).await.unwrap();
+
+        client
+            .query(&stmt, &[&account_id])
+            .await?
+            .iter()
+            .map(|row| Transaction::from_row_ref(row).unwrap())
+            .collect::<Vec<Transaction>>()
+            .pop()
+            .ok_or(MyError::NotFound)
+    }
+
     pub async fn create_account(
         client: &Client,
         account_info: Account,
@@ -411,6 +429,40 @@ pub mod handlers {
         Ok(HttpResponse::Ok().json(acc))
     }
 
+    // get_transaction_by_id returns the transaction details for the transaction with specified index.
+    pub async fn get_transaction_by_id(
+        account_params: web::Json<Account>,
+        db_pool: web::Data<Pool>,
+    ) -> Result<HttpResponse, Error> {
+        let client: Client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::ServiceUnavailable().json(response));
+            }
+        };
+
+        let account_info: Account = account_params.into_inner();
+
+        let acc = match db::get_transaction_by_id(&client, account_info.id).await {
+            Ok(acc) => acc,
+            Err(err) => {
+                let response: Status = Status {
+                    service: constants::service_name(),
+                    message: err.to_string(),
+                    version: constants::full_version(),
+                };
+                return Ok(HttpResponse::InternalServerError().json(response));
+            }
+        };
+
+        Ok(HttpResponse::Ok().json(acc))
+    }
+
     // create_account registers a new account to the server. Provided the
     // PostgesDB write is successful it will return the account details back to the request agent.
     pub async fn create_account(
@@ -446,6 +498,8 @@ pub mod handlers {
         Ok(HttpResponse::Ok().json(new_account))
     }
 
+    // get_transactions queries the full list of transactions from the postgres DB and returns
+    // to the request agent.
     pub async fn get_transactions(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
@@ -474,6 +528,8 @@ pub mod handlers {
         Ok(HttpResponse::Ok().json(txs))
     }
 
+    // create_transaction posts a new transaction to the postgres DB and returns
+    // the transaction details with unique ID to the request agent.
     pub async fn create_transaction(
         tx_params: web::Json<Transaction>,
         db_pool: web::Data<Pool>,
@@ -507,7 +563,7 @@ pub mod handlers {
         Ok(HttpResponse::Ok().json(new_tx))
     }
 
-    //async fn log_if_error(res: &ServiceResponse) -> String { - TODO
+    //pub async fn log_if_error(res: &ServiceResponse) -> String { - TODO
     //    if res.status().as_u16() >= 400 {
     //        let r_clone = res.clone();
     //        let bytes = actix_http::body::to_bytes(r_clone.into_body()).await.unwrap();
