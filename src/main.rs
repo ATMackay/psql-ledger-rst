@@ -5,14 +5,13 @@ use env_logger::Env;
 use lib::config::{default_config, Config};
 use lib::constants::{build_date, full_version, service_name};
 use lib::handlers::{
-    create_account, create_transaction, get_account_by_id, get_accounts, get_transactions, health,
-    status,
+    create_account, create_transaction, get_account_by_id, get_accounts, get_transaction_by_id,
+    get_transactions, health, status,
 };
 use tokio_postgres::NoTls;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
     // Read config file from flag
     let matches = clap::App::new("MyApp")
         .arg(
@@ -70,15 +69,18 @@ async fn main() -> std::io::Result<()> {
                 //    "%a %r %s %b %{Referer}i %{User-Agent}i %T %{ERROR_STATUS}xo",
                 //)
                 //.custom_response_replace("ERROR_STATUS", |res| log_if_error(res)), - TODO
-                middleware::Logger::default()
+                middleware::Logger::default(),
             )
             .service(web::resource("/status").route(web::get().to(status)))
             .service(web::resource("/health").route(web::get().to(health)))
-            .service(web::resource("/create-account").route(web::post().to(create_account)))
             .service(web::resource("/accounts").route(web::get().to(get_accounts)))
-            .service(web::resource("/account-by-id").route(web::get().to(get_account_by_id)))
             .service(web::resource("/transactions").route(web::get().to(get_transactions)))
-            .service(web::resource("/create-tx").route(web::post().to(create_transaction)));
+            .service(web::resource("/account-by-id").route(web::post().to(get_account_by_id)))
+            .service(
+                web::resource("/transaction-by-id").route(web::post().to(get_transaction_by_id)),
+            )
+            .service(web::resource("/create-account").route(web::put().to(create_account)))
+            .service(web::resource("/create-tx").route(web::put().to(create_transaction)));
 
         // Log all available endpoints - TODO
         //for resource in app.resources() {
