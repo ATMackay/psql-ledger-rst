@@ -90,41 +90,47 @@ pub mod config {
 }
 
 pub mod models {
-    //use chrono::{DateTime, Utc};
-    use serde::{Deserialize, Serialize}; // Serializer
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer}; //
     use tokio_pg_mapper_derive::PostgresMapper;
 
-    #[derive(Deserialize, PostgresMapper, Serialize)]
+    #[derive(Deserialize, PostgresMapper, Serialize, Debug)]
     #[pg_mapper(table = "accounts")]
     pub struct Account {
         pub id: i64,
         pub username: String,
         pub email: String,
         pub balance: i64,
-        //#[serde(serialize_with = "serialize_datetime")]
-        //pub created_at: DateTime<Utc>,
+        #[serde(
+            serialize_with = "serialize_datetime",
+            deserialize_with = "deserialize_datetime"
+        )]
+        pub created_at: DateTime<Utc>,
     }
-    #[derive(Deserialize, PostgresMapper, Serialize)]
+    #[derive(Deserialize, PostgresMapper, Serialize, Debug)]
     #[pg_mapper(table = "transactions")]
     pub struct Transaction {
         pub id: i64,
         pub from_account: i64,
         pub to_account: i64,
         pub amount: i64,
-        //#[serde(serialize_with = "serialize_datetime")]
-        //pub created_at: DateTime<Utc>,
+        #[serde(
+            serialize_with = "serialize_datetime",
+            deserialize_with = "deserialize_datetime"
+        )]
+        pub created_at: DateTime<Utc>,
     }
 
     // status represents the default JSON
     // response format (also used to encode error messages)
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Debug)]
     pub struct Status {
         pub service: String,
         pub version: String,
         pub message: String,
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Debug)]
     pub struct Health {
         pub service: String,
         pub version: String,
@@ -132,14 +138,23 @@ pub mod models {
         pub failures: Vec<String>,
     }
 
-    // Custom serialization function for DateTime<Utc> - TODO
-    //fn serialize_datetime<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-    //where
-    //    S: Serializer,
-    //{
-    //    let s = date.to_rfc3339();
-    //    serializer.serialize_str(&s)
-    //}
+    // Custom serialization function for DateTime<Utc>
+    fn serialize_datetime<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = date.to_rfc3339();
+        serializer.serialize_str(&s)
+    }
+
+    // Custom deserialization function for DateTime<Utc>
+    fn deserialize_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<DateTime<Utc>>().map_err(serde::de::Error::custom)
+    }
 }
 
 pub mod db {
@@ -310,12 +325,12 @@ pub mod handlers {
         models::{Account, Health, Status, Transaction},
     };
     use actix_web::{web, Error, HttpResponse};
+    use chrono::Utc;
     use deadpool_postgres::{Client, Pool};
-    //use serde_json::Value;
-    //use actix_http;
 
     // status always responds ok if the service is live and listening for requests
     pub async fn status() -> Result<HttpResponse, Error> {
+        //println!("STATUS PINGED");
         let status_response: Status = Status {
             service: constants::service_name(),
             message: "OK".to_string(),
@@ -327,6 +342,8 @@ pub mod handlers {
     // health pings the postgres database, returning a 503 status code if the postgres ping fails.
     pub async fn health(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
         let mut failures = Vec::new();
+
+        //println!("HEALTH PINGED");
 
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
@@ -368,6 +385,9 @@ pub mod handlers {
     // get accounts returns the full (non-paginated) list of user accounts from the
     // postgres DB.
     pub async fn get_accounts(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+
+        //println!("GET ACCOUNTS PINGED");
+
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
@@ -400,6 +420,10 @@ pub mod handlers {
         account_params: web::Json<Account>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
+
+        let account_info: Account = account_params.into_inner();
+        //println!("GET ACCOUNT BY ID: {:?}", account_info);
+
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
@@ -412,7 +436,7 @@ pub mod handlers {
             }
         };
 
-        let account_info: Account = account_params.into_inner();
+
 
         let acc = match db::get_account_by_id(&client, account_info.id).await {
             Ok(acc) => acc,
@@ -431,9 +455,13 @@ pub mod handlers {
 
     // get_transaction_by_id returns the transaction details for the transaction with specified index.
     pub async fn get_transaction_by_id(
-        account_params: web::Json<Account>,
+        tx_params: web::Json<Transaction>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
+
+        let tx_info: Transaction = tx_params.into_inner();
+        //println!("TX BY ID PINGED: {:?}", tx_info);
+
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
@@ -446,9 +474,7 @@ pub mod handlers {
             }
         };
 
-        let account_info: Account = account_params.into_inner();
-
-        let acc = match db::get_transaction_by_id(&client, account_info.id).await {
+        let acc = match db::get_transaction_by_id(&client, tx_info.id).await {
             Ok(acc) => acc,
             Err(err) => {
                 let response: Status = Status {
@@ -469,7 +495,13 @@ pub mod handlers {
         account_params: web::Json<Account>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
-        let account_info: Account = account_params.into_inner();
+        let mut account_info: Account = account_params.into_inner();
+
+        // Set timestamp server-side
+        let dt = Utc::now();
+        account_info.created_at = dt;
+
+        //println!("CREATE ACCOUNT PINGED: {:?}", account_info);
 
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
@@ -534,7 +566,13 @@ pub mod handlers {
         tx_params: web::Json<Transaction>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
-        let tx_info: Transaction = tx_params.into_inner();
+        let mut tx_info: Transaction = tx_params.into_inner();
+
+        // Set timestamp server-side
+        let dt = Utc::now();
+        tx_info.created_at = dt;
+
+        //println!("CREATE TX PINGED: {:?}", tx_info);
 
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
@@ -562,17 +600,6 @@ pub mod handlers {
 
         Ok(HttpResponse::Ok().json(new_tx))
     }
-
-    //pub async fn log_if_error(res: &ServiceResponse) -> String { - TODO
-    //    if res.status().as_u16() >= 400 {
-    //        let r_clone = res.clone();
-    //        let bytes = actix_http::body::to_bytes(r_clone.into_body()).await.unwrap();
-    //        let v: Value = serde_json::from_slice(&bytes).unwrap();
-    //        v.to_string()
-    //    } else {
-    //        "-".to_string()
-    //    }
-    //}
 }
 
 pub mod client {
@@ -649,6 +676,7 @@ pub mod client {
             username: account_params.username,
             email: account_params.email,
             balance: Default::default(),
+            created_at: Default::default(),
         };
 
         let body_json = serde_json::to_string(&acc_pars).map_err(|e| {
@@ -699,6 +727,7 @@ pub mod client {
             from_account: tx_params.from_account,
             to_account: tx_params.to_account,
             amount: tx_params.amount,
+            created_at: Default::default(),
         };
 
         let body_json = serde_json::to_string(&t_pars).map_err(|e| {
