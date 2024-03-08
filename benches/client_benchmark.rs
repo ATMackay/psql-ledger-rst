@@ -8,18 +8,30 @@
 
 // TODO - not working properly
 #![allow(dead_code)]
-use criterion::{criterion_group, criterion_main, Criterion};
-
+use criterion::{criterion_group, black_box, criterion_main, Criterion};
+use tokio::runtime::Runtime; 
 use psql_ledger_rst::client::{create_account, health, status};
-use psql_ledger_rst::models::Account;
+use psql_ledger_rst::models::AccountParams;
+use rand::{thread_rng, Rng};
 
 // status GET request
 fn status_benchmark(c: &mut Criterion) {
     let server_addr = String::from("localhost:8080");
 
+    let rt = Runtime::new();
+
     c.bench_function("status", |b| {
         // measure the http round-trip time
-        b.iter(|| status(server_addr.clone()))
+        b.iter(|| {
+            rt.block_on(async {
+                // Call the async function and handle errors manually
+                match status(server_addr.clone())
+                .await {
+                    Ok(health) => black_box(health),
+                    Err(_) => panic!("healthcheck resulted in an error"),
+                };
+            });  
+        } )
     });
 }
 
@@ -27,9 +39,20 @@ fn status_benchmark(c: &mut Criterion) {
 fn health_benchmark(c: &mut Criterion) {
     let server_addr = String::from("localhost:8080");
 
+    let rt = Runtime::new().unwrap();
+
     c.bench_function("health", |b| {
         // measure the http round-trip time
-        b.iter(|| health(server_addr.clone()))
+        b.iter(|| {
+            rt.block_on(async {
+                // Call the async function and handle errors manually
+                match health(server_addr.clone())
+                .await {
+                    Ok(health) => black_box(health),
+                    Err(_) => panic!("healthcheck resulted in an error"),
+                };
+            });  
+    })
     });
 }
 
@@ -37,22 +60,36 @@ fn health_benchmark(c: &mut Criterion) {
 fn create_account_benchmark(c: &mut Criterion) {
     let server_addr = String::from("localhost:8080");
 
+    // create random number generator
+    let mut rng = thread_rng();
+
+    let rt = Runtime::new().unwrap();
+
     c.bench_function("create_account", |b| {
-        // measure the http round-trip time
-        // includes write to postgres
         b.iter(|| {
-            create_account(
-                server_addr.clone(),
-                Account {
-                    id: 0,
-                    username: String::from("john_doe"),
-                    email: String::from("john_doe@example.com"),
-                    balance: 0,
-                },
-            )
+            let random_int: i32 = rng.gen_range(0..1000000);
+            let username = format!("john_doe{}", random_int);
+            let email = format!("john_doe{}@example.com", random_int);
+
+            // Execute the async block
+            rt.block_on(async {
+                // Call the async function and handle errors manually
+                match create_account(
+                    server_addr.clone(),
+                    AccountParams {
+                        id: None,
+                        username: Some(username),
+                        email: Some(email),
+                        balance: None,
+                    },
+                ).await {
+                    Ok(account) => black_box(account),
+                    Err(_) => panic!("create_account resulted in an error"),
+                };
+            });
         })
     });
 }
 
-criterion_group!(benches, status_benchmark); // health_benchmark, create_account_benchmark
+criterion_group!(benches, create_account_benchmark); // health_benchmark, create_account_benchmark
 criterion_main!(benches);
