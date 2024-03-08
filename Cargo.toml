@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4"
-actix-http = "3.6.0"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1"
 env_logger = "0.11.1"
@@ -16,12 +15,13 @@ config = "0.13"
 deadpool-postgres = { version = "0.12", features = ["serde"] }
 tokio-pg-mapper = "0.2.0"
 tokio-pg-mapper-derive = "0.2.0"
-tokio-postgres = "0.7.6"
+tokio-postgres = {version = "0.7", features = ["with-serde_json-1", "with-chrono-0_4"]}
 envy = "0.4.2"
 chrono = "0.4.34"
 derive_more = "0.99.0"
 clap = "3.0"
 awc = "3.4.0"
+actix-contrib-logger = "0.1.0"
 
 [build-dependencies]
 toml = "0.8.10"

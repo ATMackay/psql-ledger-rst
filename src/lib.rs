@@ -90,41 +90,68 @@ pub mod config {
 }
 
 pub mod models {
-    //use chrono::{DateTime, Utc};
-    use serde::{Deserialize, Serialize}; // Serializer
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Serialize}; //
     use tokio_pg_mapper_derive::PostgresMapper;
 
-    #[derive(Deserialize, PostgresMapper, Serialize)]
+    #[derive(Deserialize, Serialize, Debug)]
+    pub struct AccountParams {
+        pub id: Option<i64>,
+        pub username: Option<String>,
+        pub email: Option<String>,
+        pub balance: Option<i64>,
+    }
+
+    #[derive(Deserialize, PostgresMapper, Serialize, Debug)]
     #[pg_mapper(table = "accounts")]
     pub struct Account {
-        pub id: i64,
-        pub username: String,
-        pub email: String,
-        pub balance: i64,
-        //#[serde(serialize_with = "serialize_datetime")]
-        //pub created_at: DateTime<Utc>,
+        pub id: Option<i64>,
+        pub username: Option<String>,
+        pub email: Option<String>,
+        pub balance: Option<i64>,
+        #[serde(
+            serialize_with = "serialize_datetime",
+            deserialize_with = "deserialize_datetime",
+            skip_serializing_if = "Option::is_none", // Skip serializing if None
+            default // Use default for deserialization, which for Option<T> is None
+        )]
+        pub created_at: Option<DateTime<Utc>>,
     }
-    #[derive(Deserialize, PostgresMapper, Serialize)]
+
+    #[derive(Deserialize, Serialize, Debug)]
+    pub struct TransactionParams {
+        pub id: Option<i64>,
+        pub from_account: Option<i64>,
+        pub to_account: Option<i64>,
+        pub amount: Option<i64>,
+    }
+
+    #[derive(Deserialize, PostgresMapper, Serialize, Debug)]
     #[pg_mapper(table = "transactions")]
     pub struct Transaction {
-        pub id: i64,
-        pub from_account: i64,
-        pub to_account: i64,
-        pub amount: i64,
-        //#[serde(serialize_with = "serialize_datetime")]
-        //pub created_at: DateTime<Utc>,
+        pub id: Option<i64>,
+        pub from_account: Option<i64>,
+        pub to_account: Option<i64>,
+        pub amount: Option<i64>,
+        #[serde(
+            serialize_with = "serialize_datetime",
+            deserialize_with = "deserialize_datetime",
+            skip_serializing_if = "Option::is_none", // Skip serializing if None
+            default // Use default for deserialization, which for Option<T> is None
+        )]
+        pub created_at: Option<DateTime<Utc>>,
     }
 
     // status represents the default JSON
     // response format (also used to encode error messages)
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Debug)]
     pub struct Status {
         pub service: String,
         pub version: String,
         pub message: String,
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Debug)]
     pub struct Health {
         pub service: String,
         pub version: String,
@@ -132,14 +159,32 @@ pub mod models {
         pub failures: Vec<String>,
     }
 
-    // Custom serialization function for DateTime<Utc> - TODO
-    //fn serialize_datetime<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-    //where
-    //    S: Serializer,
-    //{
-    //    let s = date.to_rfc3339();
-    //    serializer.serialize_str(&s)
-    //}
+    // Custom serialization function for DateTime<Utc>
+    fn serialize_datetime<S>(date: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Some(ref date) = *date {
+            let s = date.to_rfc3339();
+            serializer.serialize_some(&s)
+        } else {
+            serializer.serialize_none()
+        }
+    }
+
+    fn deserialize_datetime<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = Option::<String>::deserialize(deserializer)?;
+        if let Some(s) = s {
+            s.parse::<DateTime<Utc>>()
+                .map(Some)
+                .map_err(serde::de::Error::custom)
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 pub mod db {
@@ -219,7 +264,14 @@ pub mod db {
         let stmt = client.prepare(&_stmt).await.unwrap();
 
         client
-            .query(&stmt, &[&account_info.email, &account_info.username])
+            .query(
+                &stmt,
+                &[
+                    &account_info.username,
+                    &account_info.balance,
+                    &account_info.email,
+                ],
+            )
             .await?
             .iter()
             .map(|row| Account::from_row_ref(row).unwrap())
@@ -307,12 +359,11 @@ pub mod errors {
 pub mod handlers {
     use super::{
         constants, db,
-        models::{Account, Health, Status, Transaction},
+        models::{Account, AccountParams, Health, Status, Transaction, TransactionParams},
     };
     use actix_web::{web, Error, HttpResponse};
+    use chrono::Utc;
     use deadpool_postgres::{Client, Pool};
-    //use serde_json::Value;
-    //use actix_http;
 
     // status always responds ok if the service is live and listening for requests
     pub async fn status() -> Result<HttpResponse, Error> {
@@ -326,40 +377,27 @@ pub mod handlers {
 
     // health pings the postgres database, returning a 503 status code if the postgres ping fails.
     pub async fn health(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
-        let mut failures = Vec::new();
+        let mut health_response: Health = Health {
+            service: constants::service_name(),
+            message: "OK".to_string(),
+            version: constants::full_version(),
+            failures: Vec::new(),
+        };
 
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
-                failures.push(err.to_string());
-                let health_response: Health = Health {
-                    service: constants::service_name(),
-                    message: "FAILURES".to_string(),
-                    version: constants::full_version(),
-                    failures: failures,
-                };
+                health_response.message = "FAILURES".to_string();
+                health_response.failures = vec![err.to_string()];
                 return Ok(HttpResponse::ServiceUnavailable().json(health_response));
             }
         };
 
         match db::ping_db(&client).await {
-            Ok(_) => {
-                let health_response: Health = Health {
-                    service: constants::service_name(),
-                    message: "OK".to_string(),
-                    version: constants::full_version(),
-                    failures: failures,
-                };
-                Ok(HttpResponse::Ok().json(health_response))
-            }
+            Ok(_) => Ok(HttpResponse::Ok().json(health_response)),
             Err(err) => {
-                failures.push(err.to_string());
-                let health_response: Health = Health {
-                    service: constants::service_name(),
-                    message: "FAILURES".to_string(),
-                    version: constants::full_version(),
-                    failures: failures,
-                };
+                health_response.message = "FAILURES".to_string();
+                health_response.failures = vec![err.to_string()];
                 Ok(HttpResponse::ServiceUnavailable().json(health_response))
             }
         }
@@ -397,31 +435,39 @@ pub mod handlers {
 
     // get_account_by_id returns the account details for the account with specified index.
     pub async fn get_account_by_id(
-        account_params: web::Json<Account>,
+        account_params: web::Json<AccountParams>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
+        let account_info: AccountParams = account_params.into_inner();
+
+        let mut response: Status = Status {
+            service: constants::service_name(),
+            message: "".to_string(),
+            version: constants::full_version(),
+        };
+
+        // check user supplied parameters
+        if account_info.id == None {
+            response.message = "No id supplied".to_string();
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
                 return Ok(HttpResponse::ServiceUnavailable().json(response));
             }
         };
 
-        let account_info: Account = account_params.into_inner();
-
-        let acc = match db::get_account_by_id(&client, account_info.id).await {
+        let acc = match db::get_account_by_id(&client, account_info.id.unwrap()).await {
+            // will panic id id not supplied - fix
             Ok(acc) => acc,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
+                if err.to_string() == "NotFound" {
+                    return Ok(HttpResponse::NotFound().json(response));
+                }
                 return Ok(HttpResponse::InternalServerError().json(response));
             }
         };
@@ -431,31 +477,39 @@ pub mod handlers {
 
     // get_transaction_by_id returns the transaction details for the transaction with specified index.
     pub async fn get_transaction_by_id(
-        account_params: web::Json<Account>,
+        tx_params: web::Json<TransactionParams>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
+        let tx_info: TransactionParams = tx_params.into_inner();
+
+        let mut response: Status = Status {
+            service: constants::service_name(),
+            message: "".to_string(),
+            version: constants::full_version(),
+        };
+
+        // check user supplied parameters
+        if tx_info.id == None {
+            response.message = "No id supplied".to_string();
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
                 return Ok(HttpResponse::ServiceUnavailable().json(response));
             }
         };
 
-        let account_info: Account = account_params.into_inner();
-
-        let acc = match db::get_transaction_by_id(&client, account_info.id).await {
+        let acc = match db::get_transaction_by_id(&client, tx_info.id.unwrap()).await {
+            // will panic id id not supplied - fix
             Ok(acc) => acc,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
+                if err.to_string() == "NotFound" {
+                    return Ok(HttpResponse::NotFound().json(response));
+                }
                 return Ok(HttpResponse::InternalServerError().json(response));
             }
         };
@@ -466,31 +520,48 @@ pub mod handlers {
     // create_account registers a new account to the server. Provided the
     // PostgesDB write is successful it will return the account details back to the request agent.
     pub async fn create_account(
-        account_params: web::Json<Account>,
+        account_params: web::Json<AccountParams>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
-        let account_info: Account = account_params.into_inner();
+        let account_info: AccountParams = account_params.into_inner();
+
+        let mut response: Status = Status {
+            service: constants::service_name(),
+            message: "".to_string(),
+            version: constants::full_version(),
+        };
+
+        // check user supplied values
+        if account_info.email == None {
+            response.message = "No email supplied".to_string();
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+        if account_info.username == None {
+            response.message = "No username supplied".to_string();
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+        // Set timestamp server-side
+        let dt = Utc::now();
+        let account: Account = Account {
+            id: None, // To be set by Postgres
+            username: account_info.username,
+            email: account_info.email,
+            balance: Some(0),
+            created_at: Some(dt),
+        };
 
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
                 return Ok(HttpResponse::InternalServerError().json(response));
             }
         };
 
-        let new_account = match db::create_account(&client, account_info).await {
+        let new_account = match db::create_account(&client, account).await {
             Ok(new_account) => new_account,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
                 return Ok(HttpResponse::InternalServerError().json(response));
             }
         };
@@ -501,14 +572,15 @@ pub mod handlers {
     // get_transactions queries the full list of transactions from the postgres DB and returns
     // to the request agent.
     pub async fn get_transactions(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+        let mut response: Status = Status {
+            service: constants::service_name(),
+            message: "".to_string(),
+            version: constants::full_version(),
+        };
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
                 return Ok(HttpResponse::InternalServerError().json(response));
             }
         };
@@ -516,11 +588,7 @@ pub mod handlers {
         let txs = match db::get_transactions(&client).await {
             Ok(txs) => txs,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
                 return Ok(HttpResponse::InternalServerError().json(response));
             }
         };
@@ -531,48 +599,58 @@ pub mod handlers {
     // create_transaction posts a new transaction to the postgres DB and returns
     // the transaction details with unique ID to the request agent.
     pub async fn create_transaction(
-        tx_params: web::Json<Transaction>,
+        tx_params: web::Json<TransactionParams>,
         db_pool: web::Data<Pool>,
     ) -> Result<HttpResponse, Error> {
-        let tx_info: Transaction = tx_params.into_inner();
+        let tx_info: TransactionParams = tx_params.into_inner();
+
+        let mut response: Status = Status {
+            service: constants::service_name(),
+            message: "".to_string(),
+            version: constants::full_version(),
+        };
+
+        // check user supplied values
+        if tx_info.from_account == None {
+            response.message = "No from account supplied".to_string();
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+        if tx_info.to_account == None {
+            response.message = "No to account supplied".to_string();
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+        if tx_info.amount == None {
+            response.message = "No amount supplied".to_string();
+            return Ok(HttpResponse::BadRequest().json(response));
+        }
+        // Set timestamp server-side
+        let dt = Utc::now();
+        let tx: Transaction = Transaction {
+            id: None, // To be set by Postgres
+            from_account: tx_info.from_account,
+            to_account: tx_info.to_account,
+            amount: tx_info.amount,
+            created_at: Some(dt),
+        };
 
         let client: Client = match db_pool.get().await {
             Ok(client) => client,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
                 return Ok(HttpResponse::InternalServerError().json(response));
             }
         };
 
-        let new_tx = match db::create_transaction(&client, tx_info).await {
+        let new_tx = match db::create_transaction(&client, tx).await {
             Ok(new_tx) => new_tx,
             Err(err) => {
-                let response: Status = Status {
-                    service: constants::service_name(),
-                    message: err.to_string(),
-                    version: constants::full_version(),
-                };
+                response.message = err.to_string();
                 return Ok(HttpResponse::InternalServerError().json(response));
             }
         };
 
         Ok(HttpResponse::Ok().json(new_tx))
     }
-
-    //pub async fn log_if_error(res: &ServiceResponse) -> String { - TODO
-    //    if res.status().as_u16() >= 400 {
-    //        let r_clone = res.clone();
-    //        let bytes = actix_http::body::to_bytes(r_clone.into_body()).await.unwrap();
-    //        let v: Value = serde_json::from_slice(&bytes).unwrap();
-    //        v.to_string()
-    //    } else {
-    //        "-".to_string()
-    //    }
-    //}
 }
 
 pub mod client {
@@ -649,6 +727,7 @@ pub mod client {
             username: account_params.username,
             email: account_params.email,
             balance: Default::default(),
+            created_at: Default::default(),
         };
 
         let body_json = serde_json::to_string(&acc_pars).map_err(|e| {
@@ -699,6 +778,7 @@ pub mod client {
             from_account: tx_params.from_account,
             to_account: tx_params.to_account,
             amount: tx_params.amount,
+            created_at: Default::default(),
         };
 
         let body_json = serde_json::to_string(&t_pars).map_err(|e| {
