@@ -87,11 +87,6 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/create-account").route(web::put().to(create_account)))
             .service(web::resource("/create-tx").route(web::put().to(create_transaction)));
 
-        // Log all available endpoints - TODO
-        //for resource in app.resources() {
-        //   log::info!("registered endpoint: {}", resource.path());
-        //}
-
         app
     })
     .bind(config.server_addr.clone())?
