@@ -9,10 +9,11 @@ edition = "2021"
 actix-web = "4"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1"
-env_logger = "0.11.1"
+env_logger = "0.11"
 log = "0.4"
 config = "0.13"
 deadpool-postgres = { version = "0.12", features = ["serde"] }
+tokio = "1.36.0"
 tokio-pg-mapper = "0.2.0"
 tokio-pg-mapper-derive = "0.2.0"
 tokio-postgres = {version = "0.7", features = ["with-serde_json-1", "with-chrono-0_4"]}
@@ -22,6 +23,7 @@ derive_more = "0.99.0"
 clap = "3.0"
 awc = "3.4.0"
 actix-contrib-logger = "0.1.0"
+rand = "0.8.5"
 
 [build-dependencies]
 toml = "0.8.10"

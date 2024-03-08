@@ -655,6 +655,8 @@ pub mod handlers {
 
 pub mod client {
     #![allow(dead_code)]
+    use super::models::{AccountParams, TransactionParams};
+
     // client wrappers using Atix Web Client (awc)
     use super::models::{Account, Health, Status, Transaction};
     use actix_web::Error;
@@ -716,18 +718,17 @@ pub mod client {
 
     pub async fn create_account(
         server_addr: String,
-        account_params: Account,
+        account_params: AccountParams,
     ) -> Result<Account, Error> {
         // server_addr string must be of the form <ip>:<port>
         let url = format!("http://{}/create-account", server_addr);
 
         // sanitize before sending
-        let acc_pars = Account {
+        let acc_pars = AccountParams {
             id: Default::default(),
             username: account_params.username,
             email: account_params.email,
             balance: Default::default(),
-            created_at: Default::default(),
         };
 
         let body_json = serde_json::to_string(&acc_pars).map_err(|e| {
@@ -740,7 +741,7 @@ pub mod client {
         let client = Client::default();
 
         let mut response = client
-            .post(&url)
+            .put(&url)
             .send_json(&body_json) // Send JSON body
             .await
             .map_err(|e| {
@@ -767,18 +768,17 @@ pub mod client {
 
     pub async fn create_transaction(
         server_addr: String,
-        tx_params: Transaction,
+        tx_params: TransactionParams,
     ) -> Result<Transaction, Error> {
         // server_addr string must be of the form <ip>:<port>
         let url = format!("http://{}/create-tx", server_addr);
 
         // sanitize before sending
-        let t_pars = Transaction {
+        let t_pars = TransactionParams {
             id: Default::default(),
             from_account: tx_params.from_account,
             to_account: tx_params.to_account,
             amount: tx_params.amount,
-            created_at: Default::default(),
         };
 
         let body_json = serde_json::to_string(&t_pars).map_err(|e| {
@@ -791,7 +791,7 @@ pub mod client {
         let client = Client::default();
 
         let mut response = client
-            .post(&url)
+            .put(&url)
             .send_json(&body_json) // Send JSON body
             .await
             .map_err(|e| {
