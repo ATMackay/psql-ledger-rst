@@ -24,6 +24,7 @@ clap = "3.0"
 awc = "3.4.0"
 actix-service = "2.0.2"
 futures = "0.3.30"
+actix-contrib-logger = "0.1.0"
 
 [build-dependencies]
 toml = "0.8.10"

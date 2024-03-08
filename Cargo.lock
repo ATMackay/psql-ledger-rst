@@ -20,6 +20,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-contrib-logger"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f385cfe5971dd42895ed503c8ae11a6022aae402c20543d1ee795b66d144d4af"
+dependencies = [
+ "actix-http",
+ "actix-rt",
+ "actix-service",
+ "actix-utils",
+ "actix-web",
+ "bytes",
+ "env_logger 0.10.2",
+ "futures-core",
+ "http 0.2.11",
+ "log",
+ "pin-project-lite",
+ "regex",
+ "time",
+]
+
+[[package]]
 name = "actix-http"
 version = "3.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -87,6 +108,7 @@ version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28f32d40287d3f402ae0028a9d54bef51af15c8769492826a69d28f81893151d"
 dependencies = [
+ "actix-macros",
  "futures-core",
  "tokio",
 ]
@@ -130,7 +152,7 @@ dependencies = [
  "actix-utils",
  "futures-core",
  "http 0.2.11",
- "http 1.0.0",
+ "http 1.1.0",
  "impl-more",
  "pin-project-lite",
  "tokio",
@@ -813,6 +835,19 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
+dependencies = [
+ "humantime",
+ "is-terminal",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05e7cf40684ae96ade6232ed84582f40ce0a66efcd43a5117aef610534f8e0b8"
@@ -1069,9 +1104,9 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b32afd38673a8016f7c9ae69e5af41a58f81b1d31689040f2f1959594ce194ea"
+checksum = "21b9ddb458710bc376481b842f5da65cdf31522de232c1ca8146abce2a358258"
 dependencies = [
  "bytes",
  "fnv",
@@ -1153,6 +1188,17 @@ checksum = "824b2ae422412366ba479e8111fd301f7b5faece8149317bb81925979a53f520"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.3",
+]
+
+[[package]]
+name = "is-terminal"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f23ff5ef2b80d608d61efee834934d862cd92461afc0560dedf493e4c033738b"
+dependencies = [
+ "hermit-abi 0.3.4",
+ "libc",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1584,6 +1630,7 @@ dependencies = [
 name = "psql-ledger-rst"
 version = "0.1.0"
 dependencies = [
+ "actix-contrib-logger",
  "actix-http",
  "actix-service",
  "actix-web",
@@ -1594,7 +1641,7 @@ dependencies = [
  "criterion",
  "deadpool-postgres",
  "derive_more",
- "env_logger",
+ "env_logger 0.11.1",
  "envy",
  "futures",
  "log",

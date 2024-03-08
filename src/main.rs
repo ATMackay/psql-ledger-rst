@@ -1,5 +1,6 @@
 mod lib;
-use actix_web::{middleware, web, App, HttpServer};
+use actix_contrib_logger::middleware::Logger;
+use actix_web::{http::StatusCode, web, App, HttpServer};
 use clap;
 use env_logger::Env;
 use lib::config::{default_config, Config};
@@ -8,6 +9,7 @@ use lib::handlers::{
     create_account, create_transaction, get_account_by_id, get_accounts, get_transaction_by_id,
     get_transactions, health, status,
 };
+use log::Level;
 use tokio_postgres::NoTls;
 
 #[actix_web::main]
@@ -62,15 +64,18 @@ async fn main() -> std::io::Result<()> {
     let pool = config.pg.create_pool(None, NoTls).unwrap();
 
     let server = HttpServer::new(move || {
+        let logger = Logger::default().custom_level(|status| {
+            if status.is_server_error() {
+                Level::Error
+            } else if status == StatusCode::NOT_FOUND || status == StatusCode::BAD_REQUEST {
+                Level::Warn
+            } else {
+                Level::Debug
+            }
+        });
         let app = App::new()
             .app_data(web::Data::new(pool.clone()))
-            .wrap(
-                //middleware::Logger::new(
-                //    "%a %r %s %b %{Referer}i %{User-Agent}i %T %{ERROR_STATUS}xo",
-                //)
-                //.custom_response_replace("ERROR_STATUS", |res| log_if_error(res)), - TODO
-                middleware::Logger::default(),
-            )
+            .wrap(logger)
             .service(web::resource("/status").route(web::get().to(status)))
             .service(web::resource("/health").route(web::get().to(health)))
             .service(web::resource("/accounts").route(web::get().to(get_accounts)))
