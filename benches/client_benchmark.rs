@@ -10,8 +10,9 @@
 #![allow(dead_code)]
 use criterion::{criterion_group, criterion_main, Criterion};
 
+extern crate psql_ledger_rst; 
 use psql_ledger_rst::client::{create_account, health, status};
-use psql_ledger_rst::models::Account;
+use psql_ledger_rst::model::Account;
 
 // status GET request
 fn status_benchmark(c: &mut Criterion) {
@@ -44,10 +45,11 @@ fn create_account_benchmark(c: &mut Criterion) {
             create_account(
                 server_addr.clone(),
                 Account {
-                    id: 0,
-                    username: String::from("john_doe"),
-                    email: String::from("john_doe@example.com"),
-                    balance: 0,
+                    id: Some(0),
+                    username: Some(String::from("john_doe")),
+                    email: Some(String::from("john_doe@example.com")),
+                    balance: Some(0),
+                    created_at: None,
                 },
             )
         })

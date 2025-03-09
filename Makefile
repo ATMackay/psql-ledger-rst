@@ -1,21 +1,24 @@
 # Alex Mackay 2024
 
+clean:
+	@cargo clean
+
 build:
-	cargo build -r
+	@cargo build -r
 
 run: build
 	@./target/release/psql-ledger-rst run
 
 test: 
-	cargo test
+	@cargo test
 
 # Must have Docker installed on the host machine
 
 docker:
-	cd docker && ./build-docker.sh && cd ..
+	@cd docker && ./build-docker.sh && cd ..
 
 docker-compose: docker
-				cd docker-compose && docker-compose up
+	@cd docker-compose && docker-compose up
 
 
 # For local stack testing

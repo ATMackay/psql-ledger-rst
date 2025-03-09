@@ -46,7 +46,7 @@ pub async fn run_server(config_file: &str) -> std::io::Result<()> {
             } else if status == StatusCode::NOT_FOUND || status == StatusCode::BAD_REQUEST {
                 Level::Warn
             } else {
-                Level::Debug
+                Level::Info
             }
         });
 
