@@ -10,11 +10,11 @@ version_tag=$(git describe --tags)
 build_date=$(date -u +'%Y-%m-%d %H:%M:%S')
 
 # Set ARCH variable
-architecture=$(uname -m)
+architecture=$(uname -m) # Use Linux command
 if [ -z "$architecture" ]; then
     export ARCH="x86_64" # Linux, Windows (default)
 else
-    export ARCH=${architecture} # Mac
+    export ARCH="aarch64" # Mac
 fi
 
 docker build \
