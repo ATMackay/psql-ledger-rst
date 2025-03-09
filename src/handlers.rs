@@ -10,7 +10,7 @@ use deadpool_postgres::{Client, Pool};
 pub async fn status() -> Result<HttpResponse, Error> {
     let status_response: Status = Status {
         service: env!("SERVICE_NAME").to_string(),
-        message: "".to_string(),
+        message: "OK".to_string(),
         version: env!("VERSION").to_string(),
     };
     Ok(HttpResponse::Ok().json(status_response))
@@ -20,7 +20,6 @@ pub async fn status() -> Result<HttpResponse, Error> {
 pub async fn health(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let mut health_response: Health = Health {
         service: env!("SERVICE_NAME").to_string(),
-        message: "OK".to_string(),
         version: env!("VERSION").to_string(),
         failures: Vec::new(),
     };
@@ -28,7 +27,6 @@ pub async fn health(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let client: Client = match db_pool.get().await {
         Ok(client) => client,
         Err(err) => {
-            health_response.message = "FAILURES".to_string();
             health_response.failures = vec![err.to_string()];
             return Ok(HttpResponse::ServiceUnavailable().json(health_response));
         }
@@ -37,7 +35,6 @@ pub async fn health(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     match db::ping_db(&client).await {
         Ok(_) => Ok(HttpResponse::Ok().json(health_response)),
         Err(err) => {
-            health_response.message = "FAILURES".to_string();
             health_response.failures = vec![err.to_string()];
             Ok(HttpResponse::ServiceUnavailable().json(health_response))
         }

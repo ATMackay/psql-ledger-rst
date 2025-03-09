@@ -63,7 +63,6 @@ pub struct Status {
 pub struct Health {
     pub service: String,
     pub version: String,
-    pub message: String,
     pub failures: Vec<String>,
 }
 
