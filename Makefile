@@ -12,7 +12,7 @@ test:
 # Must have Docker installed on the host machine
 
 docker:
-	cd docker && ./build.sh && cd ..
+	cd docker && ./build-docker.sh && cd ..
 
 docker-compose: docker
 				cd docker-compose && docker-compose up

@@ -8,13 +8,20 @@ ARG ARCH
 ARG BUILD_DATE
 ARG GIT_SHA
 ARG SERVICE
+ARG VERSION
 
 # Set env variables
-ENV arch=$ARCH
-ENV build_date=$BUILD_DATE
-ENV commit_hash=$GIT_SHA
-ENV service_name=$SERVICE
-RUN echo "building service: ${service_name}, build date: ${build_date}, commit hash: ${commit_hash}, architecture: ${arch}"
+ENV ARCH=$ARCH
+ENV SERVICE_NAME=$SERVICE
+ENV BUILD_DATE=$BUILD_DATE
+ENV COMMIT_HASH=$GIT_COMMIT
+ENV GIT_VERSION_TAG=$GIT_VERSION_TAG
+
+RUN echo "building service: ${SERVICE_NAME}"
+RUN echo "version: ${GIT_VERSION_TAG}"
+RUN echo "build date: ${BUILD_DATE}"
+RUN echo "commit hash: ${COMMIT_HASH}"
+RUN echo "architecture: ${ARCH}"
 
 # Set the working directory
 WORKDIR /usr/src/psql-ledger-rst

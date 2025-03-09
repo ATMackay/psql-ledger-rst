@@ -1,6 +1,5 @@
 mod cli;
 mod config;
-mod constants;
 mod db;
 mod errors;
 mod handlers;
@@ -19,8 +18,10 @@ async fn main() -> std::io::Result<()> {
         Commands::Run(args) => run_server(&args.config).await,
         Commands::Version => {
             println!("Version: {}", env!("CARGO_PKG_VERSION"));
+            println!("Compilation Date: {}", env!("BUILD_DATE"));
+            println!("Git Version: {}", env!("GIT_VERSION_TAG"));
             println!("Commit Hash: {}", env!("GIT_COMMIT"));
-            println!("Build Date: {}", env!("BUILD_DATE"));
+            println!("Commit Date: {}", env!("GIT_COMMIT_DATE"));
             Ok(())
         }
     }

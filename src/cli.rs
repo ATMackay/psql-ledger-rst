@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
     long_about = concat!(
         "Service Name: ", env!("CARGO_PKG_NAME"), "\n",
         "Version: ", env!("CARGO_PKG_VERSION"), "\n",
+        "GitVersion: ", env!("VERSION"), "\n",
         "Commit: ", env!("GIT_COMMIT"), "\n",
         "Build Date: ", env!("BUILD_DATE"), "\n"
     )
@@ -22,7 +23,7 @@ pub enum Commands {
     /// Start the Actix Web server, connect to Postgres
     Run(RunArgs),
 
-    /// Print version information
+    /// Print full version details
     Version,
 }
 
