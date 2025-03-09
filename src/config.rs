@@ -17,11 +17,11 @@ pub struct Config {
 pub fn default_config() -> Config {
     let mut cfg = Config {
         log_level: "info".to_string(),
-        server_addr: "localhost:8080".to_string(),
+        server_addr: "0.0.0.0:8080".to_string(),
         pg: PgConfig::default(),
     };
 
-    let default_host = "localhost".to_string();
+    let default_host = "0.0.0.0".to_string();
     let default_port = 5432;
     let default_dbname = "bank".to_string();
     let default_user = "root".to_string();
