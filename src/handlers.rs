@@ -1,5 +1,5 @@
 use crate::{
-    constants, db,
+    db,
     model::{Account, AccountParams, Health, Status, Transaction, TransactionParams},
 };
 use actix_web::{web, Error, HttpResponse};
@@ -9,9 +9,9 @@ use deadpool_postgres::{Client, Pool};
 // status always responds ok if the service is live and listening for requests
 pub async fn status() -> Result<HttpResponse, Error> {
     let status_response: Status = Status {
-        service: constants::service_name(),
-        message: "OK".to_string(),
-        version: constants::full_version(),
+        service: env!("SERVICE_NAME").to_string(),
+        message: "".to_string(),
+        version: env!("VERSION").to_string(),
     };
     Ok(HttpResponse::Ok().json(status_response))
 }
@@ -19,9 +19,9 @@ pub async fn status() -> Result<HttpResponse, Error> {
 // health pings the postgres database, returning a 503 status code if the postgres ping fails.
 pub async fn health(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let mut health_response: Health = Health {
-        service: constants::service_name(),
+        service: env!("SERVICE_NAME").to_string(),
         message: "OK".to_string(),
-        version: constants::full_version(),
+        version: env!("VERSION").to_string(),
         failures: Vec::new(),
     };
 
@@ -51,9 +51,9 @@ pub async fn get_accounts(db_pool: web::Data<Pool>) -> Result<HttpResponse, Erro
         Ok(client) => client,
         Err(err) => {
             let response: Status = Status {
-                service: constants::service_name(),
+                service: env!("SERVICE_NAME").to_string(),
                 message: err.to_string(),
-                version: constants::full_version(),
+                version: env!("VERSION").to_string(),
             };
             return Ok(HttpResponse::ServiceUnavailable().json(response));
         }
@@ -63,9 +63,9 @@ pub async fn get_accounts(db_pool: web::Data<Pool>) -> Result<HttpResponse, Erro
         Ok(users) => users,
         Err(err) => {
             let response: Status = Status {
-                service: constants::service_name(),
+                service: env!("SERVICE_NAME").to_string(),
                 message: err.to_string(),
-                version: constants::full_version(),
+                version: env!("VERSION").to_string(),
             };
             return Ok(HttpResponse::InternalServerError().json(response));
         }
@@ -82,9 +82,9 @@ pub async fn get_account_by_id(
     let account_info: AccountParams = account_params.into_inner();
 
     let mut response: Status = Status {
-        service: constants::service_name(),
+        service: env!("SERVICE_NAME").to_string(),
         message: "".to_string(),
-        version: constants::full_version(),
+        version: env!("VERSION").to_string(),
     };
 
     // check user supplied parameters
@@ -124,9 +124,9 @@ pub async fn get_transaction_by_id(
     let tx_info: TransactionParams = tx_params.into_inner();
 
     let mut response: Status = Status {
-        service: constants::service_name(),
+        service: env!("SERVICE_NAME").to_string(),
         message: "".to_string(),
-        version: constants::full_version(),
+        version: env!("VERSION").to_string(),
     };
 
     // check user supplied parameters
@@ -167,9 +167,9 @@ pub async fn create_account(
     let account_info: AccountParams = account_params.into_inner();
 
     let mut response: Status = Status {
-        service: constants::service_name(),
+        service: env!("SERVICE_NAME").to_string(),
         message: "".to_string(),
-        version: constants::full_version(),
+        version: env!("VERSION").to_string(),
     };
 
     // check user supplied values
@@ -214,9 +214,9 @@ pub async fn create_account(
 // to the request agent.
 pub async fn get_transactions(db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let mut response: Status = Status {
-        service: constants::service_name(),
+        service: env!("SERVICE_NAME").to_string(),
         message: "".to_string(),
-        version: constants::full_version(),
+        version: env!("VERSION").to_string(),
     };
     let client: Client = match db_pool.get().await {
         Ok(client) => client,
@@ -246,9 +246,9 @@ pub async fn create_transaction(
     let tx_info: TransactionParams = tx_params.into_inner();
 
     let mut response: Status = Status {
-        service: constants::service_name(),
+        service: env!("SERVICE_NAME").to_string(),
         message: "".to_string(),
-        version: constants::full_version(),
+        version: env!("VERSION").to_string(),
     };
 
     // check user supplied values

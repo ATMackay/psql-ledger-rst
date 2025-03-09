@@ -3,9 +3,7 @@ use actix_web::{http::StatusCode, web, App, HttpServer};
 use env_logger::Env;
 use log::Level;
 use tokio_postgres::NoTls;
-
 use crate::config::{default_config, Config};
-use crate::constants::{build_date, full_version, service_name};
 use crate::handlers::{
     create_account, create_transaction, get_account_by_id, get_accounts, get_transaction_by_id,
     get_transactions, health, status,
@@ -30,12 +28,11 @@ pub async fn run_server(config_file: &str) -> std::io::Result<()> {
         .format_timestamp_millis()
         .init();
 
-    log::info!("Welcome to {}", service_name());
-    log::info!("Version: {}", full_version());
-    log::info!("Compilation date: {}", build_date());
+    log::info!("Welcome to {}", env!("SERVICE_NAME"));
+    log::info!("Version: {}", env!("VERSION"));
+    log::info!("Compilation date: {}", env!("BUILD_DATE"));
     log::info!("Log level: {}", &config.log_level);
     log::info!("Using config file: {}", config_file);
-    log::info!("Server Address: {}", config.server_addr);
     log::debug!("PostgreSQL Configuration: {:?}", config.pg);
 
     // Create PostgreSQL connection pool
