@@ -85,7 +85,7 @@ pub async fn get_account_by_id(
     };
 
     // check user supplied parameters
-    if account_info.id == None {
+    if account_info.id.is_none() {
         response.message = "No id supplied".to_string();
         return Ok(HttpResponse::BadRequest().json(response));
     }
@@ -127,7 +127,7 @@ pub async fn get_transaction_by_id(
     };
 
     // check user supplied parameters
-    if tx_info.id == None {
+    if tx_info.id.is_none() {
         response.message = "No id supplied".to_string();
         return Ok(HttpResponse::BadRequest().json(response));
     }
@@ -170,11 +170,11 @@ pub async fn create_account(
     };
 
     // check user supplied values
-    if account_info.email == None {
+    if account_info.email.is_none() {
         response.message = "No email supplied".to_string();
         return Ok(HttpResponse::BadRequest().json(response));
     }
-    if account_info.username == None {
+    if account_info.username.is_none() {
         response.message = "No username supplied".to_string();
         return Ok(HttpResponse::BadRequest().json(response));
     }
@@ -249,15 +249,15 @@ pub async fn create_transaction(
     };
 
     // check user supplied values
-    if tx_info.from_account == None {
+    if tx_info.from_account.is_none() {
         response.message = "No from account supplied".to_string();
         return Ok(HttpResponse::BadRequest().json(response));
     }
-    if tx_info.to_account == None {
+    if tx_info.to_account.is_none() {
         response.message = "No to account supplied".to_string();
         return Ok(HttpResponse::BadRequest().json(response));
     }
-    if tx_info.amount == None {
+    if tx_info.amount.is_none() {
         response.message = "No amount supplied".to_string();
         return Ok(HttpResponse::BadRequest().json(response));
     }

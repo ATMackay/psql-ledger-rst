@@ -8,8 +8,6 @@ use clap::{Parser, Subcommand};
     long_about = concat!(
         "Service Name: ", env!("CARGO_PKG_NAME"), "\n",
         "Version: ", env!("CARGO_PKG_VERSION"), "\n",
-        "GitVersion: ", env!("VERSION"), "\n",
-        "Commit: ", env!("GIT_COMMIT"), "\n",
         "Build Date: ", env!("BUILD_DATE"), "\n"
     )
 )]

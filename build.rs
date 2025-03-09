@@ -12,7 +12,7 @@ fn main() {
 
     // Git commit hash
     let git_output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
+        .args(["rev-parse", "HEAD"])
         .output()
         .unwrap();
     let git_hash = String::from_utf8(git_output.stdout).unwrap();
@@ -22,7 +22,7 @@ fn main() {
 
     // Git commit timestamp
     let git_output = Command::new("git")
-    .args(&["show", "-s", "--format='%ci'", git_hash])
+    .args(["show", "-s", "--format='%ci'", git_hash])
     .output()
     .unwrap();
     let git_timestamp = String::from_utf8(git_output.stdout).unwrap();
@@ -31,7 +31,7 @@ fn main() {
 
     // Git semver
     let git_output = Command::new("git")
-        .args(&["describe", "--tags"])
+        .args(["describe", "--tags"])
         .output()
         .unwrap();
     let git_ver = String::from_utf8(git_output.stdout).unwrap();
