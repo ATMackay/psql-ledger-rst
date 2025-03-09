@@ -100,4 +100,4 @@ def e2e_status(n: int):
     print(f"Rate: {n/elapsed_time} req/s")
 
 if __name__ == "__main__":
-    e2e_fetch_accounts(1000) # Replace with method of your choosing
+    e2e_status(1000) # Replace with method of your choosing
