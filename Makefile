@@ -3,11 +3,8 @@
 build:
 	cargo build -r
 
-run:
-	cargo run -r
-
-run-debug:
-	cargo run
+run: build
+	@./target/release/psql-ledger-rst run
 
 test: 
 	cargo test
@@ -46,4 +43,4 @@ migratedown:
 benchmarks:
 	cargo bench
 
-.PHONY: build run run-debug test docker docker-compose postgresup postgresdown createdb dropdb migrateup migratedown 
+.PHONY: build run test docker docker-compose postgresup postgresdown createdb dropdb migrateup migratedown 
